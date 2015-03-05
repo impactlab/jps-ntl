@@ -27,20 +27,17 @@ br.set_handle_robots(False)
 br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
 
 br.addheaders = [('User-agent', r'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko')]
-
-# The site we will navigate into, handling it's session
+ 
+# THe site doesn't seem to like it when we try to login directly, if we do it gives
+# "Invalid direct reference to form login page"
+# So we request the home page first, then try to log in.  
 resp = br.open(svc_home)
-
 time.sleep(0.2)
 
+# Now open the login page
 resp = br.open(svc_login)
 
-# View available forms
-for f in br.forms():
-    print f
-
-
-# Select the second (index one) form (the first form is a search query box)
+# Select the first form on the login page
 br.select_form(nr=0)
 
 # User credentials
