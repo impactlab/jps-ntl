@@ -10,7 +10,7 @@ import csv
 meters = ['005T1110',]
 svc_domain = r'http://jps-amiprod2.jps.net:9090/'
 user_name = r'TPlagge'
-user_pass = r'password_01'
+user_pass = r''
 output_file = r'measurement.csv'
 
 # Serviewcom parameters
