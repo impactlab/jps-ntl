@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load bootstrap3 %}
+{% load static %}
+{% block title %}JPS Large Accounts Viewer{% endblock %}
+{% block nav_user %}
+  {% if user.is_authenticated %}
+    <ul class="nav navbar-nav navbar-right">
+      <li id="nav-username"><a href="{% url 'viewer.views.profile' %}">
+        <span class="glyphicon glyphicon-user"></span>  {{ user.get_username }} &nbsp; </a>
+      </li>
+      <li>
+        <a href="{% url 'django.contrib.auth.views.logout' %}">Sign out</a>
+      </li>
+    </ul>
+  {% else %}
+    <form class="navbar-form navbar-right" 
+          method="post" 
+          action="{% url 'django.contrib.auth.views.login' %}">
+      {% csrf_token %}
+      {% bootstrap_field form.username show_label=False %}
+      {% bootstrap_field form.password show_label=False %}
+      <input type="hidden" name="next" value="{% url 'viewer.views.home' %}" />
+      <button type="submit" class="btn btn-success">Sign in</button>
+    </form>
+  {% endif %}
+{% endblock %}
+{% block content %}
+  <div class="container">
+   <div class="jumbotron">
+      <div class="container">
+          <h1>JPS Large Accounts Viewer</h1>
+          <p class="lead">Non-technical loss identification</p>
+      {% if not user.is_authenticated %}
+            <p><a class="btn btn-lg btn-primary" 
+          href="{% url 'registration_register' %}">Register</a> 
+        &nbsp;
+              <a class="btn btn-lg btn-success" 
+          href="{% url 'django.contrib.auth.views.login' %}">Sign in</a>
+            </p>
+
+      {% endif %}
+    </div> <!-- /.container -->
+  </div> <!-- /.jumbotron -->
+    {% if user.is_authenticated %}
+      <div class="row">
+        <div class="col-sm-6 col-md-6">
+          <h3> Meters </h3>
+          <ul class="list-group">
+            {% for meter in user.meters.all %}
+            <a class="list-group-item" href="{% url 'meter_detail' id=meter.id %}">{{ meter }}</a>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+
+    {% endif %}
+    </div> <!-- /.container -->
+{% endblock content %}
