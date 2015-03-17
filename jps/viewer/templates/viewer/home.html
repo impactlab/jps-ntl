@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load bootstrap3 %}
 {% load static %}
+{% load django_tables2 %}
+
 {% block title %}JPS Large Accounts Viewer{% endblock %}
 {% block nav_user %}
   {% if user.is_authenticated %}
@@ -24,6 +26,7 @@
     </form>
   {% endif %}
 {% endblock %}
+
 {% block content %}
   <div class="container">
    <div class="jumbotron">
@@ -43,13 +46,15 @@
   </div> <!-- /.jumbotron -->
     {% if user.is_authenticated %}
       <div class="row">
-        <div class="col-sm-6 col-md-6">
+        <div class="col-sm-9 col-md-9">
           <h3> Meters </h3>
-          <ul class="list-group">
-            {% for meter in user.meters.all %}
-            <a class="list-group-item" href="{% url 'meter_detail' id=meter.id %}">{{ meter }}</a>
-            {% endfor %}
-          </ul>
+          <form action="{% url 'auditlist' %}" method="post">{% csrf_token %}
+            {% include "table.html" %}
+            <div class="table-container">
+              <input class="btn btn-default" type="submit" value="Update audit list"/>
+            </div>
+            <br/><br/>
+          </form>
         </div>
       </div>
 

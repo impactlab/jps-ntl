@@ -6,6 +6,7 @@ from django.contrib.contenttypes import generic
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.core.signals import request_finished
+from django.utils.safestring import mark_safe
 import string, os, fnmatch, csv, datetime, pytz, json, math
 import pandas as pd
 import numpy as np
@@ -13,6 +14,8 @@ import numpy as np
 class Meter(models.Model):
   meter_id = models.CharField(max_length=32)
   user = models.ForeignKey(User, related_name='meters')
+  overall_score = models.FloatField(default=0.0)
+  on_auditlist = models.BooleanField(default=False)
 
   def __unicode__(self):
     return unicode(self.meter_id)
@@ -137,3 +140,19 @@ class Meter(models.Model):
     if end_date is not None:
       qs = qs.filter(ts__lt=end_date)
     return sum([i.kwh for i in qs.all()])
+
+import django_tables2 as tables
+from django_tables2.utils import A
+
+class MeterTable(tables.Table):
+  meter_id = tables.LinkColumn('meter_detail', args=[A('pk')])
+  overall_score = tables.Column()
+  audit = tables.CheckBoxColumn(accessor="pk", orderable=True,
+    attrs={'th__input': {'type':"text", 'value':"Audit list", 
+                         'readonly':None, 'style': 'border: none'}})
+
+  def render_audit(self, record):
+    if record.on_auditlist:
+      return mark_safe('<input class="auditCheckBox" name="audit" value="'+str(record.pk)+'"" type="checkbox" checked/>')
+    else:   
+      return mark_safe('<input class="auditCheckBox" name="audit" value="'+str(record.pk)+'"" type="checkbox"/>')

@@ -9,6 +9,7 @@ from django.core.urlresolvers import reverse
 from django.views.generic.edit import UpdateView, CreateView, DeleteView
 from django.template import RequestContext
 from django.forms.models import modelform_factory
+from django_tables2 import RequestConfig
 from django import forms
 import json
 from models import *
@@ -22,8 +23,12 @@ class LoginRequiredMixin(object):
     return login_required(view)
 
 def home(request):
+  queryset = Meter.objects.all()
+  table = MeterTable(queryset)
+  RequestConfig(request).configure(table)
   if (request.user.is_authenticated()):
-    return render(request, 'viewer/home.html')
+    return render_to_response('viewer/home.html', {'table': table},
+      context_instance=RequestContext(request))
   return login(request, template_name='viewer/home.html')
 
 @login_required
@@ -39,3 +44,13 @@ def meter_detail(request, id):
              'events_data': meter.events_data(),
              'meas_diag_data': meter.meas_diag_data()}
   return render(request, 'viewer/meter_detail.html', context)
+
+@login_required
+def auditlist(request):
+  if request.method == 'POST':
+    pks = [int(i) for i in request.POST.getlist('audit')]
+    for meter in Meter.objects.all():
+      meter.on_auditlist=True if meter.pk in pks else False
+      meter.save()
+  return HttpResponseRedirect(reverse('home'))
+
