@@ -38,6 +38,25 @@ class Meter(models.Model):
                 meter=self, ts=ts, \
                 kwh=float(line[2]), kva=float(line[3]))
 
+  def _load_event_data(self, dir='/data/events'):
+    tz = pytz.timezone('America/Jamaica')
+    for f in os.listdir(dir):
+      if fnmatch.fnmatch(f, self.meter_id+'*'):
+        with open(dir+'/'+f, 'r') as myf:
+          fcsv = csv.reader(myf)
+          fcsv.next()
+          for line in fcsv:
+            ts = datetime.datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S')
+            ts = ts.replace(tzinfo=tz)
+            try: 
+              dp = EventDataPoint.objects.get(\
+                meter=self, ts=ts, \
+                event=line[2])
+            except:
+              EventDataPoint.objects.create(\
+                meter=self, ts=ts, \
+                event=line[2])
+
   def meas_diag_data(self, date=None):
     if self.measurement_points.count()==0:
       return {}
@@ -80,6 +99,17 @@ class Meter(models.Model):
     }
     
 
+  def events_data(self, start_date=None):
+    if start_date is None:
+      tslast = self.profile_points.order_by('-ts')[0].ts
+      start_date = tslast - datetime.timedelta(days=30)
+    data = [{'date': i.ts.strftime('%Y-%m-%d %H:%M:%S'), 'text': i.event}
+              for i in reversed(\
+                self.events.filter(ts__gte=start_date).\
+                order_by('-ts'))] 
+    return json.dumps(data)
+           
+
   def format_ami_data(self, start_date=None, fmt='json'):
     if start_date is None:
       tslast = self.profile_points.order_by('-ts')[0].ts
@@ -108,6 +138,10 @@ class Meter(models.Model):
       qs = qs.filter(ts__lt=end_date)
     return sum([i.kwh for i in qs.all()])
 
+class EventDataPoint(models.Model):
+  meter = models.ForeignKey('Meter', related_name='events')
+  ts = models.DateTimeField()
+  event = models.CharField(max_length=200)
 
 class ProfileDataPoint(models.Model):
   meter = models.ForeignKey('Meter', related_name='profile_points')

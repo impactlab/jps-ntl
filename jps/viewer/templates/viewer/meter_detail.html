@@ -25,6 +25,13 @@ svg {
   shape-rendering: crispEdges;
 }
 
+.tooltip {
+  position:absolute;
+  width: 400px;
+  height: 28px;
+  pointer-events: none;
+}
+
 .brush .extent {
   fill-opacity: .125;
   shape-rendering: crispEdges;
@@ -253,6 +260,7 @@ function createHeatMap(id,data,w,h) {
 function createBrushAreaChart(id,data,evtdata,w,h) {
 
   var parseDate = d3.time.format("%Y-%m-%d %H:%M").parse;
+  var parseDates = d3.time.format("%Y-%m-%d %H:%M:%S").parse;
 
   data.forEach(function(d) {
     d.date = parseDate(d.date);
@@ -261,7 +269,7 @@ function createBrushAreaChart(id,data,evtdata,w,h) {
   });
 
   evtdata.forEach(function(d) {
-    d.date = parseDate(d.date);
+    d.date = parseDates(d.date);
     d.text = d.text;
     return d;
   });
@@ -362,25 +370,33 @@ function createBrushAreaChart(id,data,evtdata,w,h) {
     .attr("transform", "rotate(-90)")
     .text("Select");
 
+  var tooltip = d3.select("body").append("div")
+    .attr("class","tooltip").style("opacity",0);
+
   lines = evt.selectAll(".line")
     .data(evtdata)
     .enter()
     .append("line")
     .attr('class', 'line')
     .attr("stroke", "black")
-    .attr("stroke-width", 1)
+    .attr("stroke-width", 3)
     .attr("x1", function(d) { return x2(d.date)})
     .attr("x2", function(d) { return x2(d.date)})
     .attr("y1", function(d) { return y2(0)})
-    .attr("y2", function(d) { return y2(1)});
-
-  texts = evt.selectAll(".text")
-    .data(evtdata)
-    .enter()
-    .append("text")
-    .attr('class', 'text')
-    .attr("transform", function(d) { return "translate(" + x2(d.date) + "," + y2(0.5)+")"})
-    .text(function(d) { return d.text });
+    .attr("y2", function(d) { return y2(1)})
+    .on("mouseover", function(d) {
+      tooltip.transition()
+        .duration(200)
+        .style("opacity", .9);
+      tooltip.html(d.text)
+        .style("left", (d3.event.pageX+5) + "px")
+        .style("top", (d3.event.pageY-28) + "px");
+     })
+     .on("mouseout", function(d) {
+        tooltip.transition()
+          .duration(500)
+          .style("opacity", 0);
+     });
 
   evt.append("g")
     .attr("class", "x axis")
@@ -418,8 +434,6 @@ function createBrushAreaChart(id,data,evtdata,w,h) {
     evt.selectAll(".line")
       .attr("x1", function(d) { return x2(d.date)})
       .attr("x2", function(d) { return x2(d.date)});
-    evt.selectAll(".text")
-      .attr("transform", function(d) { return "translate(" + x2(d.date) + "," + y2(0.5)+")"});
     evt.select(".x.axis").call(xAxis2);
     focus.select(".area").attr("d", area);
     focus.select(".x.axis").call(xAxis);
@@ -428,10 +442,9 @@ function createBrushAreaChart(id,data,evtdata,w,h) {
 
 var heatmap_data = {{ ami_heatmap_data|safe}};
 var recent_data = {{ recent_preview_data|safe }};
+var events_data = {{ events_data|safe }};
 var meas_data = {{ meas_diag_data|safe }};
 
-heatmap = createHeatMap("#ami-heatmap",heatmap_data,900,400);
-createBrushAreaChart("#recent-preview-graph",recent_data,[{'date':recent_data[30].date, 'text': 'foo'}],900,550);
 
 config =  {data: [{t: [0], 
                    r: [meas_data["phase_a_voltage"]/meas_data["max_voltage"]], 
@@ -464,6 +477,9 @@ config =  {data: [{t: [0],
                    width:400, height:400}};
 
     micropolar.Axis().config(config).render(d3.select('#phasor-graph'));
+    heatmap = createHeatMap("#ami-heatmap",heatmap_data,900,400);
+    createBrushAreaChart("#recent-preview-graph",recent_data,
+      events_data,900,550);
 
 </script>
 {% endblock %}
