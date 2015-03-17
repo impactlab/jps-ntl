@@ -35,5 +35,6 @@ def meter_detail(request, id):
   meter = Meter.objects.get(id=id)
   context = {'meter': meter,
              'ami_heatmap_data': meter.format_ami_data(fmt='json-grid'),
-             'recent_preview_data': meter.format_ami_data(fmt='json')}
+             'recent_preview_data': meter.format_ami_data(fmt='json'),
+             'meas_diag_data': meter.meas_diag_data()}
   return render(request, 'viewer/meter_detail.html', context)
