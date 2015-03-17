@@ -148,6 +148,7 @@ class MeterTable(tables.Table):
   meter_id = tables.LinkColumn('meter_detail', args=[A('pk')])
   overall_score = tables.Column()
   audit = tables.CheckBoxColumn(accessor="pk", orderable=True,
+                                order_by=('-on_auditlist','meter_id'),
     attrs={'th__input': {'type':"text", 'value':"Audit list", 
                          'readonly':None, 'style': 'border: none'}})
 
