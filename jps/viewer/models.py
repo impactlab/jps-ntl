@@ -39,15 +39,18 @@ class Meter(models.Model):
               meter=self, ts=ts, \
               kwh=float(line[2]), kva=float(line[3]))
 
-  def format_ami_data(self, npoints=30*96, fmt='json'):
+  def format_ami_data(self, start_date=None, fmt='json'):
+    if start_date is None:
+      start_date = datetime.datetime.now() - datetime.timedelta(days=30)
     if fmt=='json':
       data = [{'date': i.ts.strftime('%Y-%m-%d %H:%M'), 'reading': i.kva}
               for i in reversed(\
-                self.profile_points.order_by('-ts')[0:npoints])] 
+                self.profile_points.filter(ts__gte=start_date).\
+                order_by('-ts'))] 
       return json.dumps(data)
     if fmt=='json-grid':
-      raw = [i for i in reversed(self.profile_points.order_by('-ts')\
-             [0:npoints])]
+      raw = [i for i in reversed(self.profile_points.\
+             filter(ts__gte==start_date).order_by('-ts'))]
       s = pd.Series([i.kva for i in raw], index=[i.ts for i in raw])
       data = [{'date': d.strftime('%Y-%m-%d'), 
                'time': d.strftime('%H:%M'),
