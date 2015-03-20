@@ -1,7 +1,7 @@
 from mrjob.job import MRJob
 import numpy as np
 
-class MRWordFrequencyCount(MRJob):
+class ProfilePercentiles(MRJob):
 
     def mapper(self, _, line):
         fields = line.split(',')
@@ -12,7 +12,8 @@ class MRWordFrequencyCount(MRJob):
 
     def reducer(self, key, values):
         profile = np.array(list(values))
-        yield key, np.percentile(profile,50)
+        pct = np.percentile(profile,50)
+        yield key, pct
 
 if __name__ == '__main__':
     MRWordFrequencyCount.run()
