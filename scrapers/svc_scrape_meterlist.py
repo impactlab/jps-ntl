@@ -48,7 +48,7 @@ br.addheaders = [('User-agent', r'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.
 # "Invalid direct reference to form login page"
 # So we request the home page first, then try to log in.  
 resp = br.open(svc_home)
-time.sleep(0.2)
+time.sleep(10)
 
 # Now open the login page
 resp = br.open(svc_login)
@@ -62,7 +62,7 @@ br.form['j_password'] = user_pass
 
 # Login
 resp = br.submit()
-time.sleep(0.2)
+time.sleep(10)
 
 current_meter_ix = 0
 meter_list = []
@@ -80,8 +80,13 @@ while current_meter_ix + METER_IX_INCR < MAX_METER_IX:
     resp = br.open(search_button_url,post_data)
     time.sleep(0.2)
     '''
-    resp = br.open(meter_names)
-    time.sleep(1.0)
+    try:
+        resp = br.open(meter_names)
+        time.sleep(10)
+    except:
+        time.sleep(30)
+        resp = br.open(meter_names)
+        time.sleep(10)
     
     meter_list = meter_list + re.findall(r'\?deviceId=(.*?)&',resp.read(),re.DOTALL)
     
@@ -89,7 +94,9 @@ while current_meter_ix + METER_IX_INCR < MAX_METER_IX:
 
 with open(OUTFILE_NAME, 'wb') as outfile:
     outfile.write(','.join(meter_list) + '\n')
+    
+a=2
    
-a=2 
+
 
 
