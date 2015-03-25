@@ -23,7 +23,8 @@ class ProfilePercentiles(MRJob):
         fields = line.split(',')
         try:
             meas_datetime = datetime.datetime.strptime(fields[1], "%Y/%m/%d %H:%M")
-            timestamp = time.mktime(meas_datetime.timetuple())
+            #Seconds since 2001/01/01
+            timestamp = time.mktime(meas_datetime.timetuple()) - 978278400.0
             yield fields[0], [float(timestamp), float(fields[2])]
         except IndexError:
             pass
@@ -42,8 +43,37 @@ class ProfilePercentiles(MRJob):
         readings = readings[perm]
         timestamps = timestamps[perm]
         
-        pct = np.percentile(readings,50)
-        yield key, pct
+        n_readings = len(readings)
+        
+        #percentiles
+        pct = np.percentile(readings,[0, 0.5, 1, 5, 10, 25, 50, 75, 90, 100])
+        
+        #fraction below threshhold 
+        frac01 = float(sum(readings<0.1))/len(readings)
+        frac1 = float(sum(readings<1.0))/len(readings)
+        low_counts = np.bincount(((timestamps - timestamps[0])%86400).astype('int64'),weights=(readings<0.1))
+        low_pct = np.percentile(low_counts, [50, 90, 95, 99, 100])
+        low_fracs = [frac01, frac1, list(low_pct)]       
+        
+        #Time breakdowns
+        weekday_median=np.median(readings[timestamps%604800>432000])
+        weekend_median=np.median(readings[timestamps%604800<432000])
+        day_median=np.median(readings[(timestamps-32400)%86400>43200])
+        night_median=np.median(readings[(timestamps-32400)%86400<43200])
+        time_breaks = [weekday_median, weekend_median, day_median, night_median]
+        
+        #Sliding windows 
+        edge_window = lambda ll: np.concatenate((np.ones(ll)*1.0, np.ones(ll)*-1.0))
+        window_week = np.max(np.convolve(readings, edge_window(672),'valid'))
+        window_month = np.max(np.convolve(readings, edge_window(2688),'valid'))
+        windows = [window_week, window_month]
+        
+        
+        #High frequency power spectrum
+        ps = np.abs(np.fft.fft(readings))
+        hfps = sum(ps[int(n_readings/4):int(n_readings/2)])/sum(ps)    
+        
+        yield (key, [list(pct), low_fracs, time_breaks, windows, hfps])
 
 if __name__ == '__main__':
     ProfilePercentiles.run()
