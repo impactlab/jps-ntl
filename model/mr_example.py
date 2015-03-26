@@ -20,13 +20,13 @@ python mr_example.py -r emr s3://jps-ami-dumps/
 class ProfilePercentiles(MRJob):
 
     def mapper(self, _, line):
-        fields = line.split(',')
+        fields = [f.strip(' "') for f in line.strip().split(',')]
         try:
             meas_datetime = datetime.datetime.strptime(fields[1], "%Y/%m/%d %H:%M")
             #Seconds since 2001/01/01
             timestamp = time.mktime(meas_datetime.timetuple()) - 978278400.0
             yield fields[0], [float(timestamp), float(fields[2])]
-        except IndexError:
+        except (IndexError, ValueError) as e:
             pass
 
     def reducer(self, key, values):
