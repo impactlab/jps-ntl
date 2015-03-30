@@ -17,7 +17,7 @@ python mr_example.py -r emr s3://jps-ami-dumps/1096444__2001-01-01T000000__2015-
 python mr_example.py -r emr s3://jps-ami-dumps/
 """
 
-class ProfilePercentiles(MRJob):
+class ProfileFeatures(MRJob):
 
     def mapper(self, _, line):
         fields = [f.strip(' "') for f in line.strip().split(',')]
@@ -46,13 +46,17 @@ class ProfilePercentiles(MRJob):
         n_readings = len(readings)
         
         #percentiles
-        pct = np.percentile(readings,[0, 0.5, 1, 5, 10, 25, 50, 75, 90, 100])
+        pct_pre = np.percentile(readings,[0, 0.5, 1, 5, 10, 25, 75, 90, 100, 50]) 
+        pct = pct_pre[:-1]/pct_pre[-1]
+        
+        #mean
+        read_mean = np.mean(readings)/pct_pre[-1]
         
         #fraction below threshhold 
         frac01 = float(sum(readings<0.1))/len(readings)
         frac1 = float(sum(readings<1.0))/len(readings)
-        low_counts = np.bincount(((timestamps - timestamps[0])%86400).astype('int64'),weights=(readings<0.1))
-        low_pct = np.percentile(low_counts, [50, 90, 95, 99, 100])
+        low_counts = np.bincount(((timestamps - timestamps[0])/86400).astype('int64'),weights=(readings<0.1))
+        low_pct = np.percentile(low_counts, [50, 90, 95, 99, 100])/96.0
         low_fracs = [frac01, frac1, list(low_pct)]       
         
         #Time breakdowns
@@ -61,19 +65,23 @@ class ProfilePercentiles(MRJob):
         day_median=np.median(readings[(timestamps-32400)%86400>43200])
         night_median=np.median(readings[(timestamps-32400)%86400<43200])
         time_breaks = [weekday_median, weekend_median, day_median, night_median]
+        time_breaks = [xx/pct_pre[-1] for xx in time_breaks]
         
         #Sliding windows 
         edge_window = lambda ll: np.concatenate((np.ones(ll)*1.0, np.ones(ll)*-1.0))
         window_week = np.max(np.convolve(readings, edge_window(672),'valid'))
         window_month = np.max(np.convolve(readings, edge_window(2688),'valid'))
-        windows = [window_week, window_month]
-        
+        windows = [window_week/672, window_month/2888]
+        windows = [xx/pct_pre[-1] for xx in windows]
         
         #High frequency power spectrum
         ps = np.abs(np.fft.fft(readings))
-        hfps = sum(ps[int(n_readings/4):int(n_readings/2)])/sum(ps)    
+        hfps1 = sum(ps[int(n_readings/4):int(n_readings/2)])/sum(ps) 
+        hfps2 = sum(ps[int(n_readings/8):int(n_readings/2)])/sum(ps)  
+        hfps3 = sum(ps[int(n_readings/16):int(n_readings/2)])/sum(ps)  
+        hfps = [hfps1, hfps2, hfps3]
         
-        yield (key, [list(pct), low_fracs, time_breaks, windows, hfps])
+        yield (key, [list(pct), read_mean, low_fracs, time_breaks, windows, hfps])
 
 if __name__ == '__main__':
-    ProfilePercentiles.run()
+    ProfileFeatures.run()

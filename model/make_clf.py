@@ -1,10 +1,11 @@
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.cross_validation import cross_val_score
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-features_file = '../data/features-05-cleaned.txt'
+features_file = '../data/features-3-30-cleaned.txt'
 labels_file = '../data/meter_to_flag.csv'
 
 df_features = pd.read_csv(features_file)
@@ -29,16 +30,28 @@ train, test = df[df['is_train']==True], df[df['is_train']==False]
 features = df.columns[1:num_features]
 clf = RandomForestClassifier(n_jobs=2, n_estimators = 1000)
 y, _ = pd.factorize(train['lossimpacting'])
-clf.fit(train[features], y)
+
+df_train = train[features]
+df_test = test[features]
+
+df_train = df_train.replace([np.inf, -np.inf], np.nan)
+df_train.fillna(0., inplace = True)
+
+df_test = df_test.replace([np.inf, -np.inf], np.nan)
+df_test.fillna(0., inplace = True)
+    
+clf.fit(df_train, y)
 
 # accuracy 
-preds = clf.predict(test[features])
+preds = clf.predict(df_test)
 y_tst = test['lossimpacting']
 pd.crosstab(y_tst, preds, rownames=['actual'], colnames=['preds'])
 
-scores = clf.predict_proba(test[features])[:,1]
+scores = clf.predict_proba(df_test)[:,1]
 fpr, tpr, thresholds = roc_curve(y_tst, scores)
+auc = roc_auc_score(y_tst, scores)
 
 plt.plot(fpr, tpr)
+
 
 
