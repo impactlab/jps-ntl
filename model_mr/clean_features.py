@@ -1,5 +1,5 @@
-infile = '../data/features-3-31.txt'
-outfile = '../data/features-3-31-cleaned.txt'
+infile = '../data/features-4-1.txt'
+outfile = '../data/features-4-1-cleaned.txt'
 
 import json
 import csv
@@ -18,5 +18,6 @@ with open(infile, 'rb') as infh:
         for line in infh: 
             fields = line.strip().split('\t')
             line_obj = json.loads(fields[1])
+            key_obj = json.loads(fields[0])
             if len(line_obj)>1:
-                out_writer.writerow(list(fields[0]) + list(flatten(line_obj[1:])))      
+                out_writer.writerow(key_obj + list(flatten(line_obj[1:])))      

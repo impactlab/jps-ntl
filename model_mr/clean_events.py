@@ -70,7 +70,7 @@ with open(infile, 'rb') as infh:
     else:
         unique_ids = list(set(ids))
       
-    df = pd.DataFrame(index=ids, columns=unique_events)
+    df = pd.DataFrame(index=unique_ids, columns=unique_events)
     df = df.fillna(0) # with 0s rather than NaNs    
     
     for k, v in count_dict.items():
