@@ -45,6 +45,7 @@ INSTALLED_APPS = (
     'registration',
     'bootstrap3',
     'django_tables2',
+    'django_select2',
     'viewer'
 )
 

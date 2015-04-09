@@ -10,12 +10,29 @@ from django.utils.safestring import mark_safe
 import string, os, fnmatch, csv, datetime, pytz, json, math
 import pandas as pd
 import numpy as np
+from datapoints import ProfileDataPoint, EventDataPoint, MeasurementDataPoint
+from group import Group
 
 class Meter(models.Model):
   meter_id = models.CharField(max_length=32)
   user = models.ForeignKey(User, related_name='meters')
   overall_score = models.FloatField(default=0.0)
   on_auditlist = models.BooleanField(default=False)
+  total_usage = models.FloatField(default=0.0)
+  groups = models.ManyToManyField(Group)
+
+  def update_total_usage(self, start_date=None):
+    if self.profile_points.count() == 0: 
+      self.total_usage = 0
+      return
+    if start_date is None:
+      tslast = self.profile_points.order_by('-ts')[0].ts
+      start_date = tslast - datetime.timedelta(days=30)
+    raw = [i for i in reversed(self.profile_points.\
+           filter(ts__gte=start_date).order_by('-ts'))]
+    s = pd.Series([i.kw for i in raw], index=[i.ts for i in raw])
+    s = s.resample('60T').dropna()
+    self.total_usage = int(s.sum())
 
   def __unicode__(self):
     return unicode(self.meter_id)
@@ -23,42 +40,149 @@ class Meter(models.Model):
   def get_absolute_url(self):
     return reverse('detail', kwargs={'id': self.id})
 
-  def _load_data(self, dir='/data/profile'):
+  def _load_data(self, dir='/data/extract', turbo=False):
     tz = pytz.timezone('America/Jamaica')
     for f in os.listdir(dir):
       if fnmatch.fnmatch(f, self.meter_id+'__*'):
         with open(dir+'/'+f, 'r') as myf:
           fcsv = csv.reader(myf)
+          linecount = 0
           for line in fcsv:
             ts = datetime.datetime.strptime(line[1], '%Y/%m/%d %H:%M')
             ts = ts.replace(tzinfo=tz)
-            try: 
-              dp = ProfileDataPoint.objects.get(\
-                meter=self, ts=ts, \
-                kwh=float(line[2]), kva=float(line[3]))
-            except:
+            if not turbo:
+              try: 
+                dp = ProfileDataPoint.objects.get(\
+                  meter=self, ts=ts, \
+                  kw=float(line[2]), kva=float(line[3]))
+              except:
+                ProfileDataPoint.objects.create(\
+                  meter=self, ts=ts, \
+                  kw=float(line[2]), kva=float(line[3]))
+            else:
               ProfileDataPoint.objects.create(\
                 meter=self, ts=ts, \
-                kwh=float(line[2]), kva=float(line[3]))
+                kw=float(line[2]), kva=float(line[3]))
+            linecount = linecount + 1
+    return True if linecount > 0 else False
 
-  def _load_event_data(self, dir='/data/events'):
+  def _load_event_data(self, dir='/data/extract', turbo=False):
     tz = pytz.timezone('America/Jamaica')
     for f in os.listdir(dir):
-      if fnmatch.fnmatch(f, self.meter_id+'*'):
+      if fnmatch.fnmatch(f, 'evt__'+self.meter_id+'__*'):
         with open(dir+'/'+f, 'r') as myf:
           fcsv = csv.reader(myf)
-          fcsv.next()
+          h = fcsv.next()
           for line in fcsv:
+            if len(line) <= 1: continue
             ts = datetime.datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S')
             ts = ts.replace(tzinfo=tz)
-            try: 
-              dp = EventDataPoint.objects.get(\
-                meter=self, ts=ts, \
-                event=line[2])
-            except:
+            if not turbo:
+              try: 
+                dp = EventDataPoint.objects.get(\
+                  meter=self, ts=ts, \
+                  event=line[2])
+              except:
+                EventDataPoint.objects.create(\
+                  meter=self, ts=ts, \
+                  event=line[2])
+            else:
               EventDataPoint.objects.create(\
                 meter=self, ts=ts, \
                 event=line[2])
+    return True
+
+  def _load_measurement_data(self, filename):
+    with open(filename, 'r') as myf:
+      fcsv = csv.reader(myf)
+      header = fcsv.next()
+      for line in fcsv:
+        if line[0] == self.meter_id:
+          try:
+            ts = datetime.datetime.strptime(line[1], '%Y-%m-%d %H:%M:%S')
+          except:
+            continue
+          tz = pytz.timezone('America/Jamaica')
+          ts = ts.replace(tzinfo=tz)
+          try: 
+            dp = MeasurementDataPoint.objects.get(\
+              meter=self, ts=ts)
+          except:
+            dp = MeasurementDataPoint(\
+              meter=self, ts=ts)
+          for h,d in zip(header, line):
+            if h=='DeviceId' or h=='Code': pass
+            elif h=="Time Of Last Interrogation": 
+              if d=='': continue
+              ts = datetime.datetime.strptime(d, '%Y-%m-%d %H:%M:%S')
+              ts = ts.replace(tzinfo=tz)
+              dp.time_of_last_interrogation = ts
+            elif h=="Time Of Last Outage": 
+              if d=='': continue
+              ts = datetime.datetime.strptime(d, '%Y-%m-%d %H:%M:%S')
+              ts = ts.replace(tzinfo=tz)
+              dp.time_of_last_outage = ts
+            elif h=="Phase B Current angle": dp.phase_b_current_angle = float(d)
+            elif h=="Daylight Savings Time Configured": dp.daylight_savings_time_configured = True if d=='True' else False
+            elif h=="Low Battery Error": dp.low_battery_error = True if d=='True' else False
+            elif h=="Metrology Communications Fatal Error": dp.metrology_communications_fatal_error = True if d=='True' else False
+            elif h=="Diagnostic Error (Inactive Phase)": dp.inactive_phase = True if d=='True' else False
+            elif h=="Diag Count 3": dp.diag_count_3 = int(d)
+            elif h=="Diag Count 4": dp.diag_count_4 = int(d)
+            elif h=="Times Programmed Count": dp.times_programmed_count = int(d)
+            elif h=="Early Power Fail Count": dp.early_power_fail_count = int(d)
+            elif h=="Good Battery Reading": dp.good_battery_reading = int(d)
+            elif h=="File System Fatal Error": dp.file_system_fatal_error = True if d=='True' else False
+            elif h=="Diag Count 2": dp.diag_count_2 = int(d)
+            elif h=="Phase A Current": dp.phase_a_current = float(d)
+            elif h=="Phase A Current angle": dp.phase_a_current_angle = float(d)
+            elif h=="ABC PHASE Rotation": dp.abc_phase_rotation = int(d)
+            elif h=="Diagnostic Error (Voltage Deviation)": dp.voltage_deviation = True if d=='True' else False
+            elif h=="Diagnostic Error (Phase Angle Displacement)": dp.phase_angle_displacement = True if d=='True' else False
+            elif h=="Power Outage Count": dp.power_outage_count = int(d)
+            elif h=="SLC Error": dp.slc_error = True if d=='True' else False
+            elif h=="Phase B Voltage": dp.phase_b_voltage = float(d)
+            elif h=="Phase B Voltage angle": dp.phase_b_voltage_angle = float(d)
+            elif h=="Phase C Voltage angle": dp.phase_c_voltage_angle = float(d)
+            elif h=="Phase C Current angle": dp.phase_c_current_angle = float(d)
+            elif h=="Phase A DC Detect": dp.phase_a_dc_detect = float(d)
+            elif h=="Demand Reset Count": dp.demand_reset_count = int(d)
+            elif h=="TOU Schedule Error": dp.tou_schedule_error = True if d=='True' else False
+            elif h=="Reverse Power Flow Error": dp.reverse_power_flow_error = True if d=='True' else False
+            elif h=="Diag 5 Phase B Count": dp.diag_5_phase_b_count = int(d)
+            elif h=="Demand Interval Length": dp.demand_interval_length = int(d)
+            elif h=="Phase B DC Detect": dp.phase_b_dc_detect = float(d)
+            elif h=="Register Full Scale Exceeded Error": dp.register_full_scale_exceeded_error = True if d=='True' else False
+            elif h=="EPF Data Fatal Error": dp.epf_data_fatal_error = True if d=='True' else False
+            elif h=="Phase A Voltage": dp.phase_a_voltage = float(d)
+            elif h=="Phase B Current": dp.phase_b_current = float(d)
+            elif h=="Phase C Current": dp.phase_c_current = float(d)
+            elif h=="Current Battery Reading": dp.current_battery_reading = int(d)
+            elif h=="Demand Threshold Exceeded Error": dp.demand_threshold_exceeded_error = True if d=='True' else False
+            elif h=="Metrology Communications Error": dp.metrology_communications_error = True if d=='True' else False
+            elif h=="RAM Fatal Error": dp.ram_fatal_error = True if d=='True' else False
+            elif h=="Diag 5 Phase A Count": dp.diag_5_phase_a_count = int(d)
+            elif h=="Diag 5 Phase C Count": dp.diag_5_phase_c_count = int(d)
+            elif h=="Current Season": dp.current_season = int(d)
+            elif h=="Phase C DC Detect": dp.phase_c_dc_detect = float(d)
+            elif h=="Days Since Demand Reset": dp.days_since_demand_reset = int(d)
+            elif h=="Days Since Last Test": dp.days_since_last_test = int(d)
+            elif h=="Days On Battery": dp.days_on_battery = int(d)
+            elif h=="Phase Loss Error": dp.phase_loss_error = True if d=='True' else False
+            elif h=="Mass Memory Error": dp.mass_memory_error = True if d=='True' else False
+            elif h=="Diagnostic Error (Cross Phase Flow)": dp.cross_phase_flow = True if d=='True' else False
+            elif h=="Diagnostic Error (Current Waveform Distorsion)": dp.current_waveform_distorsion = True if d=='True' else False
+            elif h=="Phase C Voltage": dp.phase_c_voltage = float(d)
+            elif h=="Service Type Detected": dp.service_type_detected = int(d)
+            elif h=="MCU Flash Fatal Error": dp.mcu_flash_fatal_error = True if d=='True' else False
+            elif h=="Data Flash Fatal Error": dp.data_flash_fatal_error = True if d=='True' else False
+            elif h=="Diag Count 1": dp.diag_count_1 = int(d)
+            elif h=="Diag Count 5": dp.diag_count_5 = int(d)
+            elif h=="Clock Sync Error": dp.clock_sync_error = True if d=='True' else False
+            elif h=="Site Scan Error": dp.site_scan_error = True if d=='True' else False
+            else: print 'XXX '+h+' unrecognized'
+          dp.save()
+    return True
 
   def meas_diag_data(self, date=None):
     if self.measurement_points.count()==0:
@@ -103,6 +227,7 @@ class Meter(models.Model):
     
 
   def events_data(self, start_date=None):
+    if self.profile_points.count()==0: return None
     if start_date is None:
       tslast = self.profile_points.order_by('-ts')[0].ts
       start_date = tslast - datetime.timedelta(days=30)
@@ -114,32 +239,61 @@ class Meter(models.Model):
            
 
   def format_ami_data(self, start_date=None, fmt='json'):
+    if self.profile_points.count() == 0: return None
     if start_date is None:
       tslast = self.profile_points.order_by('-ts')[0].ts
       start_date = tslast - datetime.timedelta(days=30)
     if fmt=='json':
-      data = [{'date': i.ts.strftime('%Y-%m-%d %H:%M'), 'reading': i.kva}
+      data = [{'date': i.ts.strftime('%Y-%m-%d %H:%M'), 'reading': i.kw}
               for i in reversed(\
                 self.profile_points.filter(ts__gte=start_date).\
                 order_by('-ts'))] 
       return json.dumps(data)
-    if fmt=='json-grid':
+    elif fmt=='json-grid':
       raw = [i for i in reversed(self.profile_points.\
              filter(ts__gte=start_date).order_by('-ts'))]
-      s = pd.Series([i.kva for i in raw], index=[i.ts for i in raw])
+      s = pd.Series([i.kw for i in raw], index=[i.ts for i in raw])
       data = [{'date': d.strftime('%Y-%m-%d'), 
                'time': d.strftime('%H:%M'),
                'reading': v} for d,v in \
                s.resample('15T').dropna().iteritems()]
       return json.dumps(data)
+    elif fmt=='csv':
+      data = [[i.ts.strftime('%Y-%m-%d %H:%M'), i.kw, i.kva] \
+              for i in reversed(\
+                self.profile_points.filter(ts__gte=start_date).\
+                order_by('-ts'))] 
+      return data
 
-  def total_usage(self, start_date=None, end_date=None):
-    qs = self.profile_points
-    if start_date is not None:
-      qs = qs.filter(ts__gte=start_date)
-    if end_date is not None:
-      qs = qs.filter(ts__lt=end_date)
-    return sum([i.kwh for i in qs.all()])
+
+  def format_event_data(self, start_date=None, fmt='json'):
+    if start_date is None:
+      tslast = self.profile_points.order_by('-ts')[0].ts
+      start_date = tslast - datetime.timedelta(days=30)
+    if fmt=='json':
+      data = [{'date': i.ts.strftime('%Y-%m-%d %H:%M'), 'event': i.event}
+              for i in reversed(\
+                self.events.filter(ts__gte=start_date).\
+                order_by('-ts'))] 
+      return json.dumps(data)
+    if fmt=='json-grid':
+      raw = [i for i in reversed(self.profile_points.\
+             filter(ts__gte=start_date).order_by('-ts'))]
+      s = pd.Series([1 for i in raw], index=[i.ts for i in raw])
+      s = s.resample('15T', how='sum')
+      s[np.isnan(s)] = 0
+      data = [{'date': d.strftime('%Y-%m-%d'), 
+               'time': d.strftime('%H:%M'),
+               'reading': v} for d,v in \
+               s.iteritems()]
+      return json.dumps(data)
+    if fmt=='csv':
+      data = [[i.ts.strftime('%Y-%m-%d %H:%M'), i.event]
+              for i in reversed(\
+                self.events.filter(ts__gte=start_date).\
+                order_by('-ts'))] 
+      return data
+
 
 import django_tables2 as tables
 from django_tables2.utils import A
@@ -147,10 +301,15 @@ from django_tables2.utils import A
 class MeterTable(tables.Table):
   meter_id = tables.LinkColumn('meter_detail', args=[A('pk')])
   overall_score = tables.Column()
+  total_usage = tables.Column()
   audit = tables.CheckBoxColumn(accessor="pk", orderable=True,
                                 order_by=('-on_auditlist','meter_id'),
     attrs={'th__input': {'type':"text", 'value':"Audit list", 
                          'readonly':None, 'style': 'border: none'}})
+
+  class Meta:
+    model = Meter
+    fields = ( 'meter_id', 'overall_score', 'total_usage', 'audit' )
 
   def render_audit(self, record):
     if record.on_auditlist:

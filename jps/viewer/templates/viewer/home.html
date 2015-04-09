@@ -1,6 +1,6 @@
 {% extends "base.html" %}
+{% load staticfiles %}
 {% load bootstrap3 %}
-{% load static %}
 {% load django_tables2 %}
 
 {% block title %}JPS Large Accounts Viewer{% endblock %}
@@ -28,7 +28,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="container">
+  <div class="container-fluid">
    <div class="jumbotron">
       <div class="container">
           <h1>JPS Large Accounts Viewer</h1>
@@ -46,16 +46,25 @@
   </div> <!-- /.jumbotron -->
     {% if user.is_authenticated %}
       <div class="row">
-        <div class="col-sm-9 col-md-9">
+        <div class="col-md-9">
           <h3> Meters </h3>
           <form action="{% url 'auditlist' %}" method="post">{% csrf_token %}
             {% include "table.html" %}
-            <div class="table-container">
+            <br/><br/>
+            <div class="btn-group" role="group">
               <input class="btn btn-default" type="submit" value="Update audit list"/>
+              <a href="{% url "download_auditlist" %}" class="btn btn-default" >Download audit list</a>
             </div>
             <br/><br/>
           </form>
         </div>
+        <!--<div class="col-md-3">
+          <h3> Groups </h3>
+          <form id="filter-form" method="post" action="">{% csrf_token %}
+            <table> {{ form }} </table>
+            <input class="btn btn-default" type="submit" value="Update filter"/>
+          </form>
+        </div> -->
       </div>
 
     {% endif %}
