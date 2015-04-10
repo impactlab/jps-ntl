@@ -1,5 +1,4 @@
 {% load static from staticfiles %}
-{% load django_select2_tags %}
 {% load bootstrap3 %}
 <!DOCTYPE html>
 <html lang="en">
@@ -7,43 +6,23 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <script src="{% static "js/jquery-1.7.2.min.js" %}"></script>
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.11.4/themes/smoothness/jquery-ui.css">
+    <script src="//code.jquery.com/jquery-1.10.2.js"></script>
+    <script src="//code.jquery.com/ui/1.11.4/jquery-ui.js"></script>
+
+    {% bootstrap_javascript jquery=False %}
 
     <title>{% block title %}{% endblock %}</title>
     {% bootstrap_css %}
-    {% import_django_select2_js_css light=1 %}
     <link href="{% static "css/custom.css" %}" rel="stylesheet">
   </head>
 
 <body>
   <div class="wrapper">
     <div class="navbar navbar-inverse">
-      <div class="container">
         <div class="navbar-header">
-          <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </button>
-          <a class="navbar-brand" href="{% url 'viewer.views.home' %}">Home</a>
+          <a class="navbar-brand" href="{% url 'home' %}">Home</a>
         </div>
-        <div class="navbar-collapse collapse">
-          <ul class="nav navbar-nav">
-          </ul>
-          {% block nav_user %}
-            {% if user.is_authenticated %}
-              <ul class="nav navbar-nav navbar-right">
-                <li id="nav-username"><a href="{% url 'viewer.views.profile' %}">
-                  <span class="glyphicon glyphicon-user"></span>  {{ user.get_username }} &nbsp; </a>
-                </li>
-                <li>
-                  <a href="{% url 'django.contrib.auth.views.logout' %}">Sign out</a>
-                </li>
-              </ul>
-            {% endif %}
-          {% endblock %}
-        </div><!--/.navbar-collapse -->
-      </div>
     </div>
 {% block content %}
 {% endblock %}
@@ -56,7 +35,5 @@
     </footer>
     </div>
   </div>
-
-  {% bootstrap_javascript jquery=True %}
 </body>
 </html>

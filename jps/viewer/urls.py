@@ -7,4 +7,5 @@ urlpatterns = patterns('',
         url(r'^meter/(?P<id>\d+)/$', views.meter_detail, name='meter_detail'),
         url(r'^auditlist/download$', views.download_auditlist, name='download_auditlist'),
         url(r'^auditlist/$', views.auditlist, name='auditlist'),
+        url(r'^api/get_groups/', views.get_groups, name='get_groups'),
         )

@@ -11,5 +11,4 @@ urlpatterns = patterns('',
     url(r'^accounts/', include('registration.backends.default.urls')),
     url(r'^$', 'viewer.views.home', name='home'),
     url(r'^profile/$', 'viewer.views.profile', name='profile'),
-    url(r'^select2/', include('django_select2.urls')),
 )

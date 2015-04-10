@@ -12,58 +12,64 @@ from django.template import RequestContext
 from django.forms.models import modelform_factory
 from django_tables2 import RequestConfig
 from django import forms
-from viewer.forms import GroupFilterForm
-import json
+import json, re
+from django.db.models import Q
 from models import *
 
 from viewer import models
 
-class LoginRequiredMixin(object):
-  @classmethod
-  def as_view(cls, **initkwargs):
-    view = super(LoginRequiredMixin, cls).as_view(**initkwargs)
-    return login_required(view)
-
 def home(request):
-  t = loader.get_template('viewer/home.html')
   context = {}
 
-  formset, queryset = None, None
-  if request.GET:
-    formset = GroupFilterForm(request.GET)
-    if formset.is_valid():
-      groups = formset.cleaned_data['groups']
-      queryset = Meter.objects.filter(groups__in=groups).all()
-    else:
-      queryset = Meter.objects.filter(total_usage__gt=0)
-  else:
-    formset = GroupFilterForm()
-    queryset = Meter.objects.all()
+  queryset = Meter.objects.filter(total_usage__gt=0)
+  if ('q' in request.GET) and request.GET['q'].strip():
+    query_string = request.GET['q']
+    q = Q(**{"meter_id__icontains": query_string})
+    queryset = queryset.filter(q)
+
+  if ('g' in request.GET) and request.GET['g'].strip():
+    query_string = request.GET['g']
+    q = Q(**{"metergroups__name__icontains": query_string})
+    queryset = queryset.filter(q)
 
   table = MeterTable(queryset)
   RequestConfig(request).configure(table)
-  context['form'] = formset
   context['table'] = table
-  c = RequestContext(request,context)
-  if (request.user.is_authenticated()):
-    return HttpResponse(t.render(c))
-  return login(request, template_name='viewer/home.html')
 
-@login_required
+  t = loader.get_template('viewer/home.html')
+  c = RequestContext(request,context)
+  return HttpResponse(t.render(c))
+
 def profile(request):
   return render(request, template_name='viewer/profile.html')
 
-@login_required
 def meter_detail(request, id):
   meter = Meter.objects.get(id=id)
-  context = {'meter': meter,
+
+  if ('rmgroup' in request.GET) and request.GET['rmgroup'].strip():
+    try:
+      group = MeterGroup.objects.get(name=request.GET['rmgroup'])
+      meter.metergroups.remove(group)
+      if group.meter_set.count() == 0:
+        group.delete()
+    except:
+      pass
+
+  if ('addgroup' in request.GET) and request.GET['addgroup'].strip():
+    group = None
+    try:
+      group = MeterGroup.objects.get(name=request.GET['addgroup'])
+    except:
+      group = MeterGroup.objects.create(name=request.GET['addgroup'])
+    meter.metergroups.add(group)
+
+  context = {'meter': meter, 'groups': MeterGroup.objects,
              'ami_heatmap_data': meter.format_ami_data(fmt='json-grid'),
              'recent_preview_data': meter.format_ami_data(fmt='json'),
              'events_data': meter.events_data(),
              'meas_diag_data': meter.meas_diag_data()}
   return render(request, 'viewer/meter_detail.html', context)
 
-@login_required
 def auditlist(request):
   if request.method == 'POST':
     pks = [int(i) for i in request.POST.getlist('audit')]
@@ -72,9 +78,7 @@ def auditlist(request):
       meter.save()
   return HttpResponseRedirect(reverse('home'))
 
-@login_required
 def download_auditlist(request):
-  print "dl"
   meters = Meter.objects.filter(on_auditlist=True)
   response = HttpResponse(content_type='text/csv')
   response['Content-Disposition'] = 'attachment; filename="AuditList.csv"'
@@ -83,7 +87,6 @@ def download_auditlist(request):
     f.writerow([m.meter_id, m.overall_score])
   return response
 
-@login_required
 def download_meter(request, id):
   m = Meter.objects.get(id=id)
   response = HttpResponse(content_type='text/csv')
@@ -103,4 +106,18 @@ def download_meter(request, id):
   for k,v in m.meas_diag_data().iteritems():
     f.writerow([k,v])
   return response
+
+def get_groups(request):
+  q = request.GET.get('term', '')
+  groups = MeterGroup.objects.filter(name__icontains = q )[:20]
+  results = []
+  for group in groups:
+    group_json = {}
+    group_json['id'] = group.id
+    group_json['label'] = group.name
+    group_json['value'] = group.name
+    results.append(group_json)
+  data = json.dumps(results)
+  mimetype = 'application/json'
+  return HttpResponse(data, mimetype)
 

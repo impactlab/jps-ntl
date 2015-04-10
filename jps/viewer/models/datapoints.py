@@ -1,6 +1,5 @@
 from django.db import models
 from django.conf import settings
-from django.contrib.auth.models import User, Group
 from django.core.urlresolvers import reverse
 from django.contrib.contenttypes import generic
 from django.db.models.signals import post_save

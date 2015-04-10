@@ -4,69 +4,52 @@
 {% load django_tables2 %}
 
 {% block title %}JPS Large Accounts Viewer{% endblock %}
-{% block nav_user %}
-  {% if user.is_authenticated %}
-    <ul class="nav navbar-nav navbar-right">
-      <li id="nav-username"><a href="{% url 'viewer.views.profile' %}">
-        <span class="glyphicon glyphicon-user"></span>  {{ user.get_username }} &nbsp; </a>
-      </li>
-      <li>
-        <a href="{% url 'django.contrib.auth.views.logout' %}">Sign out</a>
-      </li>
-    </ul>
-  {% else %}
-    <form class="navbar-form navbar-right" 
-          method="post" 
-          action="{% url 'django.contrib.auth.views.login' %}">
-      {% csrf_token %}
-      {% bootstrap_field form.username show_label=False %}
-      {% bootstrap_field form.password show_label=False %}
-      <input type="hidden" name="next" value="{% url 'viewer.views.home' %}" />
-      <button type="submit" class="btn btn-success">Sign in</button>
-    </form>
-  {% endif %}
-{% endblock %}
 
 {% block content %}
   <div class="container-fluid">
    <div class="jumbotron">
       <div class="container">
           <h1>JPS Large Accounts Viewer</h1>
-          <p class="lead">Non-technical loss identification</p>
-      {% if not user.is_authenticated %}
-            <p><a class="btn btn-lg btn-primary" 
-          href="{% url 'registration_register' %}">Register</a> 
-        &nbsp;
-              <a class="btn btn-lg btn-success" 
-          href="{% url 'django.contrib.auth.views.login' %}">Sign in</a>
-            </p>
-
-      {% endif %}
     </div> <!-- /.container -->
   </div> <!-- /.jumbotron -->
-    {% if user.is_authenticated %}
-      <div class="row">
-        <div class="col-md-9">
-          <h3> Meters </h3>
-          <form action="{% url 'auditlist' %}" method="post">{% csrf_token %}
-            {% include "table.html" %}
-            <br/><br/>
-            <div class="btn-group" role="group">
-              <input class="btn btn-default" type="submit" value="Update audit list"/>
-              <a href="{% url "download_auditlist" %}" class="btn btn-default" >Download audit list</a>
-            </div>
-            <br/><br/>
-          </form>
-        </div>
-        <!--<div class="col-md-3">
-          <h3> Groups </h3>
-          <form id="filter-form" method="post" action="">{% csrf_token %}
-            <table> {{ form }} </table>
-            <input class="btn btn-default" type="submit" value="Update filter"/>
-          </form>
-        </div> -->
+  <div class="container">
+    <div class="row">
+      <div class="col-md-9">
+        <h3> Meters </h3>
+        {% if request.GET.q %}
+          <div class="alert alert-info" role="alert">
+            Searched for ID {{ request.GET.q }}.
+            <a href="{% url 'home' %}" class="alert-link">(clear)</a>
+          </div>
+        {% endif %}
+        {% if request.GET.g %}
+          <div class="alert alert-info" role="alert">
+            Searched for group {{ request.GET.g }}.
+            <a href="{% url 'home' %}" class="alert-link">(clear)</a>
+          </div>
+        {% endif %}
+        <form action="{% url 'auditlist' %}" method="post">{% csrf_token %}
+          {% include "table.html" %}
+          <div class="btn-group" role="group">
+            <input class="btn btn-default" type="submit" value="Update audit list"/>
+            <a href="{% url "download_auditlist" %}" class="btn btn-default" >Download audit list</a>
+          </div>
+          <br/><br/>
+        </form>
       </div>
-
-    {% endif %}
-    </div> <!-- /.container -->
+      <div class="col-md-3">
+        <h3> Search </h3>
+        <h4> By Meter ID </h4>
+        <form method="get" action="{% url 'home' %}"> 
+           <input type="text" name="q" id="id_q"/>
+           <input type="submit" value="Submit"/>
+        </form>
+        <h4> By Group </h4>
+        <form method="get" action="{% url 'home' %}"> 
+           <input type="text" name="g" id="id_g"/>
+           <input type="submit" value="Submit"/>
+        </form>
+      </div> 
+    </div>
+  </div> <!-- /.container -->
 {% endblock content %}

@@ -1,6 +1,5 @@
 from django.db import models
 from django.conf import settings
-from django.contrib.auth.models import User, Group
 from django.core.urlresolvers import reverse
 from django.contrib.contenttypes import generic
 from django.db.models.signals import post_save
@@ -11,15 +10,14 @@ import string, os, fnmatch, csv, datetime, pytz, json, math
 import pandas as pd
 import numpy as np
 from datapoints import ProfileDataPoint, EventDataPoint, MeasurementDataPoint
-from group import Group
+from metergroup import MeterGroup
 
 class Meter(models.Model):
   meter_id = models.CharField(max_length=32)
-  user = models.ForeignKey(User, related_name='meters')
   overall_score = models.FloatField(default=0.0)
   on_auditlist = models.BooleanField(default=False)
   total_usage = models.FloatField(default=0.0)
-  groups = models.ManyToManyField(Group)
+  metergroups = models.ManyToManyField(MeterGroup, verbose_name='Groups')
 
   def update_total_usage(self, start_date=None):
     if self.profile_points.count() == 0: 
@@ -302,6 +300,7 @@ class MeterTable(tables.Table):
   meter_id = tables.LinkColumn('meter_detail', args=[A('pk')])
   overall_score = tables.Column()
   total_usage = tables.Column()
+  groups = tables.Column(empty_values=(), orderable=False)
   audit = tables.CheckBoxColumn(accessor="pk", orderable=True,
                                 order_by=('-on_auditlist','meter_id'),
     attrs={'th__input': {'type':"text", 'value':"Audit list", 
@@ -309,10 +308,25 @@ class MeterTable(tables.Table):
 
   class Meta:
     model = Meter
-    fields = ( 'meter_id', 'overall_score', 'total_usage', 'audit' )
+    fields = ( 'meter_id', 'overall_score', 'total_usage', 'audit', 'groups' )
 
   def render_audit(self, record):
     if record.on_auditlist:
       return mark_safe('<input class="auditCheckBox" name="audit" value="'+str(record.pk)+'"" type="checkbox" checked/>')
     else:   
       return mark_safe('<input class="auditCheckBox" name="audit" value="'+str(record.pk)+'"" type="checkbox"/>')
+
+  def render_overall_score(self, record):
+    return '%5.2f' % (record.overall_score,)
+
+  def render_total_usage(self, record):
+    return '{:,.0f} kWh'.format(record.total_usage)
+
+  def render_groups(self, record):
+    retval = ''
+    print('foo')
+    print(record.metergroups.all())
+    for i in record.metergroups.all():
+      retval = retval + i.name + ', '
+    if retval == '': return retval
+    return retval[:-2]

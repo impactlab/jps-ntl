@@ -42,10 +42,8 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'registration',
     'bootstrap3',
     'django_tables2',
-    'django_select2',
     'viewer'
 )
 
