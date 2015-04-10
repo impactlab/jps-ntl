@@ -302,9 +302,10 @@ class MeterTable(tables.Table):
   total_usage = tables.Column()
   groups = tables.Column(empty_values=(), orderable=False)
   audit = tables.CheckBoxColumn(accessor="pk", orderable=True,
-                                order_by=('-on_auditlist','meter_id'),
+                                order_by=('-on_auditlist','overall_score'),
     attrs={'th__input': {'type':"text", 'value':"Audit list", 
-                         'readonly':None, 'style': 'border: none'}})
+                         'readonly':None, 'style': 'border: none'},
+           'td': {'width':'50px'}})
 
   class Meta:
     model = Meter
@@ -312,9 +313,9 @@ class MeterTable(tables.Table):
 
   def render_audit(self, record):
     if record.on_auditlist:
-      return mark_safe('<input class="auditCheckBox" name="audit" value="'+str(record.pk)+'"" type="checkbox" checked/>')
+      return mark_safe('<input class="auditCheckBox" name="audit" value="'+str(record.pk)+'" type="checkbox" checked/> <input type="hidden" value="'+str(record.pk)+'"" name="auditVisible"/>')
     else:   
-      return mark_safe('<input class="auditCheckBox" name="audit" value="'+str(record.pk)+'"" type="checkbox"/>')
+      return mark_safe('<input class="auditCheckBox" name="audit" value="'+str(record.pk)+'" type="checkbox"/> <input type="hidden" value="'+str(record.pk)+'"" name="auditVisible"/>')
 
   def render_overall_score(self, record):
     return '%5.2f' % (record.overall_score,)
@@ -324,8 +325,6 @@ class MeterTable(tables.Table):
 
   def render_groups(self, record):
     retval = ''
-    print('foo')
-    print(record.metergroups.all())
     for i in record.metergroups.all():
       retval = retval + i.name + ', '
     if retval == '': return retval

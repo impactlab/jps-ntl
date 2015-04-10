@@ -33,7 +33,7 @@ def home(request):
     queryset = queryset.filter(q)
 
   table = MeterTable(queryset)
-  RequestConfig(request).configure(table)
+  RequestConfig(request, paginate={'per_page': 100}).configure(table)
   context['table'] = table
 
   t = loader.get_template('viewer/home.html')
@@ -72,10 +72,15 @@ def meter_detail(request, id):
 
 def auditlist(request):
   if request.method == 'POST':
+    pks = [int(i) for i in request.POST.getlist('auditVisible')]
+    queryset = Meter.objects.filter(pk__in=pks)
     pks = [int(i) for i in request.POST.getlist('audit')]
-    for meter in Meter.objects.all():
-      meter.on_auditlist=True if meter.pk in pks else False
-      meter.save()
+    queryset.filter(pk__in=pks).update(on_auditlist=True)
+    queryset.exclude(pk__in=pks).update(on_auditlist=False)
+  return HttpResponseRedirect(reverse('home'))
+
+def clear_auditlist(request):
+  Meter.objects.all().update(on_auditlist=False)
   return HttpResponseRedirect(reverse('home'))
 
 def download_auditlist(request):
@@ -84,7 +89,16 @@ def download_auditlist(request):
   response['Content-Disposition'] = 'attachment; filename="AuditList.csv"'
   f = csv.writer(response)
   for m in meters:
-    f.writerow([m.meter_id, m.overall_score])
+    f.writerow([m.meter_id, m.overall_score, m.total_usage])
+  return response
+
+def download_summary(request):
+  meters = Meter.objects.all()
+  response = HttpResponse(content_type='text/csv')
+  response['Content-Disposition'] = 'attachment; filename="AuditList.csv"'
+  f = csv.writer(response)
+  for m in meters:
+    f.writerow([m.meter_id, m.overall_score, m.total_usage, m.on_auditlist])
   return response
 
 def download_meter(request, id):
