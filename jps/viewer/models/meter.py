@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 from datapoints import ProfileDataPoint, EventDataPoint, MeasurementDataPoint
 from metergroup import MeterGroup
+from account import Account
 
 class Meter(models.Model):
   meter_id = models.CharField(max_length=32)
@@ -64,6 +65,7 @@ class Meter(models.Model):
             linecount = linecount + 1
     return True if linecount > 0 else False
 
+
   def _load_event_data(self, dir='/data/extract', turbo=False):
     tz = pytz.timezone('America/Jamaica')
     for f in os.listdir(dir):
@@ -89,6 +91,57 @@ class Meter(models.Model):
                 meter=self, ts=ts, \
                 event=line[2])
     return True
+
+  def _load_account_data(self, filename):
+    with open(filename, 'r') as myf:
+      fcsv = csv.reader(myf)
+      header = fcsv.next()
+      for line in fcsv:
+        if line[0] == self.meter_id:
+          try: 
+            a = Account.objects.get(meter=self)
+          except:
+            a = Account(meter=self)
+          a.pidm = line[1]
+          a.cust_code = line[2]
+          a.last_name = line[3]
+          a.last_name_sdx = line[4]
+          a.status_ind = line[5]
+          a.start_date = line[6]
+          a.activity_date = line[7]
+          a.user_id = line[8]
+          a.ten99_ind = line[9]
+          a.first_name = line[10]
+          a.first_name_sdx = line[11]
+          a.middle_name = line[12]
+          a.middle_name_sdx = line[13]
+          a.ssn = line[14]
+          a.drivers_license = line[15]
+          a.ethn_code = line[16]
+          a.credit_rating = line[17]
+          a.employer = line[18]
+          a.pay_by_check_ind = line[19]
+          a.spouses_name = line[20]
+          a.end_date = line[21]
+          a.bmsg_code = line[22]
+          a.ten99_id = line[23]
+          a.ten99_wh_pct = line[24]
+          a.ten99_state = line[25]
+          a.natn_code_d_l = line[26]
+          a.stat_code_d_l = line[27]
+          a.spouses_ssn = line[28]
+          a.ten99_primary_ind = line[29]
+          a.title = line[30]
+          a.mmbr_type_ind = line[31]
+          a.last_name_upr = line[32]
+          a.approval_code = line[33]
+          a.lrg_prnt_ind = line[34]
+          a.lang_code = line[35]
+          a.letr_ind = line[36]
+          a.birth_date = line[37]
+          a.save()
+          return True
+      return False
 
   def _load_measurement_data(self, filename):
     with open(filename, 'r') as myf:
