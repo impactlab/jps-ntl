@@ -8,7 +8,6 @@ urlpatterns = patterns('',
 
     url(r'^viewer/', include('viewer.urls')),
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^accounts/', include('registration.backends.default.urls')),
     url(r'^$', 'viewer.views.home', name='home'),
     url(r'^profile/$', 'viewer.views.profile', name='profile'),
 )
